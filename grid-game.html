@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Infinite Grid Game</title>
+<style>
+  body {
+    font-family: sans-serif;
+    background: #f5f5f5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  canvas {
+    background: white;
+    border: 1px solid #333;
+    margin-top: 10px;
+  }
+  .controls {
+    margin-top: 10px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+</style>
+</head>
+<body>
+
+<h2>Infinite Grid Game</h2>
+
+<canvas id="canvas" width="600" height="600"></canvas>
+
+<div class="controls">
+  <button id="undoBtn">Undo</button>
+  <button id="redoBtn">Redo</button>
+  <button id="resetBtn">Reset</button>
+  <label>
+    Highlight n×n:
+    <input id="slider" type="range" min="1" max="10" value="1">
+    <span id="nValue">1</span>
+  </label>
+</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+const cellSize = 30;
+const maxX = Math.floor(canvas.width / cellSize);
+const maxY = Math.floor(canvas.height / cellSize);
+
+let blackCells = new Set();
+let undoStack = [];
+let redoStack = [];
+
+const slider = document.getElementById("slider");
+const nValue = document.getElementById("nValue");
+
+slider.addEventListener("input", () => {
+  nValue.textContent = slider.value;
+  draw();
+});
+
+function key(x, y) {
+  return `${x},${y}`;
+}
+
+function isBlack(x, y) {
+  return blackCells.has(key(x, y));
+}
+
+function setBlack(x, y, val) {
+  const k = key(x, y);
+  if (val) blackCells.add(k);
+  else blackCells.delete(k);
+}
+
+function reset() {
+  blackCells.clear();
+  undoStack = [];
+  redoStack = [];
+  setBlack(0, 0, true);
+  draw();
+}
+
+reset();
+
+function isClickable(x, y) {
+  return (
+    isBlack(x, y) &&
+    !isBlack(x, y + 1) &&
+    !isBlack(x + 1, y)
+  );
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const n = parseInt(slider.value, 10);
+
+  for (let x = 0; x < maxX; x++) {
+    for (let y = 0; y < maxY; y++) {
+      const sx = x * cellSize;
+      const sy = canvas.height - (y + 1) * cellSize;
+
+      // highlight n×n square
+      if (x < n && y < n) {
+        ctx.fillStyle = "#e6f0ff";
+        ctx.fillRect(sx, sy, cellSize, cellSize);
+      }
+
+      // grid
+      ctx.strokeStyle = "#ccc";
+      ctx.strokeRect(sx, sy, cellSize, cellSize);
+
+      // black cell
+      if (isBlack(x, y)) {
+        ctx.fillStyle = "black";
+        ctx.fillRect(sx + 2, sy + 2, cellSize - 4, cellSize - 4);
+      }
+
+      // clickable overlay (ON TOP)
+      if (isClickable(x, y)) {
+        ctx.fillStyle = "rgba(77,163,255,0.5)";
+        ctx.fillRect(sx, sy, cellSize, cellSize);
+      }
+    }
+  }
+}
+
+canvas.addEventListener("click", (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  const x = Math.floor(mx / cellSize);
+  const y = Math.floor((canvas.height - my) / cellSize);
+
+  if (!isClickable(x, y)) return;
+
+  undoStack.push(new Set(blackCells));
+  redoStack = [];
+
+  setBlack(x, y, false);
+  setBlack(x, y + 1, true);
+  setBlack(x + 1, y, true);
+
+  draw();
+});
+
+document.getElementById("undoBtn").addEventListener("click", () => {
+  if (!undoStack.length) return;
+  redoStack.push(new Set(blackCells));
+  blackCells = undoStack.pop();
+  draw();
+});
+
+document.getElementById("redoBtn").addEventListener("click", () => {
+  if (!redoStack.length) return;
+  undoStack.push(new Set(blackCells));
+  blackCells = redoStack.pop();
+  draw();
+});
+
+document.getElementById("resetBtn").addEventListener("click", reset);
+</script>
+
+</body>
+</html>
